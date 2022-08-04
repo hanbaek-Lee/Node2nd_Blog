@@ -20,7 +20,7 @@ const router = express.Router();
   OK 닉네임 최소 3자이상 알파벳 대소문자, 숫자로 구성 [자바스크립트 정규표현식] 사용하기
   OK 비밀번호 최소 4자이상, 닉메임과 같은값이 포함된 경우 실패 
   OK 비밀번호와 컨펌비밀번호 일치하면 회원가입 성공
-  4) 닉네임, 비밀번호, 비밀번호 확인을 request에서 전달받기
+  OK) 닉네임, 비밀번호, 비밀번호 확인을 request에서 전달받기
   OK 데이터 베이스에서 존재하는 닉네임 입력한채 회원가입 버튼 누르면 "중복된 닉네임 입니다." 에러메세지 response에 포함시키기
 */
 router.post("/users", async (req, res) => {
@@ -131,8 +131,6 @@ router.post(
       console.log(userId);
       const { title, content, layout } = req.body;
       const { image } = req.file;
-      console.log("image", req.file.filename);
-      // db 저장
       await Posts.create({
         title,
         content,
@@ -157,3 +155,61 @@ router.post(
     }
   }
 );
+// 게시글 삭제 API [Delete]
+router.delete("/post/:postId", authMiddleware, async (req, res) => {
+  try {
+    console.log("게시글 삭제 api");
+    const { userId, admin } = res.locals.user;
+    console.log(admin);
+    const { postId } = req.params;
+
+    const existsPost = await Posts.findOne({
+      where: {
+        postId,
+      },
+    });
+
+    // 관리자 권한을 가진 사람만 삭제 할 수 있다.s
+    if (admin == true) {
+      fs.unlinkSync("uploads/" + existsPost.image);
+      console.log("image delete");
+      await existsPost.destroy();
+      await Like.destroy({
+        where: {
+          postId,
+        },
+      });
+      res.status(200).send({
+        result: {
+          success: true,
+        },
+      });
+    }
+
+    // 게시글 작성자만 삭제 할 수 있다.
+    if (existsPost.userId != userId) {
+      res.status(200).send({
+        result: {
+          success: false,
+          errorMessage: "게시글 작성자만 삭제할 수 있습니다.",
+        },
+      });
+      return;
+    }
+
+    if (existsPost) {
+      fs.unlinkSync("uploads/" + existsPost.image);
+      console.log("image delete");
+      await existsPost.destroy();
+      await existsLike.destroy();
+
+      res.status(200).send({
+        result: {
+          success: true,
+        },
+      });
+    }
+  } catch (error) {
+    console.log(error);
+  }
+});
